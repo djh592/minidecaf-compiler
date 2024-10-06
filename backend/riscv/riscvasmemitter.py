@@ -89,6 +89,27 @@ class RiscvAsmEmitter():
             if instr.op == TacBinaryOp.LOR:
                 self.seq.append(Riscv.Binary(RvBinaryOp.OR, instr.dst, instr.lhs, instr.rhs))
                 self.seq.append(Riscv.Unary(RvUnaryOp.SNEZ, instr.dst, instr.dst))
+            elif instr.op == TacBinaryOp.LAND:
+                self.seq.append(Riscv.Unary(RvUnaryOp.SNEZ, instr.dst, instr.lhs))
+                self.seq.append(Riscv.Binary(RvBinaryOp.SUB, instr.dst, Riscv.ZERO, instr.dst))
+                self.seq.append(Riscv.Binary(RvBinaryOp.AND, instr.dst, instr.dst, instr.rhs))
+                self.seq.append(Riscv.Unary(RvUnaryOp.SNEZ, instr.dst, instr.dst))
+            elif instr.op == TacBinaryOp.EQU:
+                self.seq.append(Riscv.Binary(RvBinaryOp.XOR, instr.dst, instr.lhs, instr.rhs))
+                self.seq.append(Riscv.Unary(RvUnaryOp.SEQZ, instr.dst, instr.dst))
+            elif instr.op == TacBinaryOp.NEQ:
+                self.seq.append(Riscv.Binary(RvBinaryOp.XOR, instr.dst, instr.lhs, instr.rhs))
+                self.seq.append(Riscv.Unary(RvUnaryOp.SNEZ, instr.dst, instr.dst))
+            elif instr.op == TacBinaryOp.SLT:
+                self.seq.append(Riscv.Binary(RvBinaryOp.SLT, instr.dst, instr.lhs, instr.rhs))
+            elif instr.op == TacBinaryOp.SGT:
+                self.seq.append(Riscv.Binary(RvBinaryOp.SLT, instr.dst, instr.rhs, instr.lhs))
+            elif instr.op == TacBinaryOp.LEQ:
+                self.seq.append(Riscv.Binary(RvBinaryOp.SLT, instr.dst, instr.rhs, instr.lhs))
+                self.seq.append(Riscv.Unary(RvUnaryOp.SEQZ, instr.dst, instr.dst))
+            elif instr.op == TacBinaryOp.GEQ:
+                self.seq.append(Riscv.Binary(RvBinaryOp.SLT, instr.dst, instr.lhs, instr.rhs))
+                self.seq.append(Riscv.Unary(RvUnaryOp.SEQZ, instr.dst, instr.dst))
             else:
                 op = {
                     TacBinaryOp.ADD: RvBinaryOp.ADD,

@@ -32,6 +32,13 @@ class TacBinaryOp(Enum):
     MUL = auto()
     DIV = auto()
     MOD = auto()
+    LAND = auto()
+    EQU = auto()
+    NEQ = auto()
+    SLT = auto()
+    LEQ = auto()
+    SGT = auto()
+    GEQ = auto()
 
 
 # Kinds of branching with conditions.
