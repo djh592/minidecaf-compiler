@@ -93,6 +93,10 @@ class RiscvAsmEmitter():
                 op = {
                     TacBinaryOp.ADD: RvBinaryOp.ADD,
                     # You can add binary operations here.
+                    TacBinaryOp.SUB: RvBinaryOp.SUB,
+                    TacBinaryOp.MUL: RvBinaryOp.MUL,
+                    TacBinaryOp.DIV: RvBinaryOp.DIV,
+                    TacBinaryOp.MOD: RvBinaryOp.REM,
                 }[instr.op]
                 self.seq.append(Riscv.Binary(op, instr.dst, instr.lhs, instr.rhs))
 
