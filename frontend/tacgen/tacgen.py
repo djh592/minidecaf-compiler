@@ -161,7 +161,8 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         """
         1. Set the 'val' attribute of ident as the temp variable of the 'symbol' attribute of ident.
         """
-        raise NotImplementedError
+        ident.setattr("val", ident.getattr("symbol").temp)
+        # raise NotImplementedError
 
     def visitDeclaration(self, decl: Declaration, mv: TACFuncEmitter) -> None:
         """
@@ -169,7 +170,12 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         2. Use mv.freshTemp to get a new temp variable for this symbol.
         3. If the declaration has an initial value, use mv.visitAssignment to set it.
         """
-        raise NotImplementedError
+        symbol = decl.getattr("symbol")
+        symbol.temp = mv.freshTemp()
+        if decl.init_expr is not NULL:
+            decl.init_expr.accept(self, mv)
+            mv.visitAssignment(symbol.temp, decl.init_expr.getattr("val"))
+        # raise NotImplementedError
 
     def visitAssignment(self, expr: Assignment, mv: TACFuncEmitter) -> None:
         """
@@ -177,7 +183,10 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         2. Use mv.visitAssignment to emit an assignment instruction.
         3. Set the 'val' attribute of expr as the value of assignment instruction.
         """
-        raise NotImplementedError
+        expr.rhs.accept(self, mv)
+        expr.lhs.accept(self, mv)
+        expr.setattr("val", mv.visitAssignment(expr.lhs.getattr("symbol").temp, expr.rhs.getattr("val")))
+        # raise NotImplementedError
 
     def visitIf(self, stmt: If, mv: TACFuncEmitter) -> None:
         stmt.cond.accept(self, mv)
