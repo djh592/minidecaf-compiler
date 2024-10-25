@@ -27,6 +27,23 @@ class CFG:
         You can start from basic block 0 and do a DFS traversal of the CFG
         to find all the reachable basic blocks.
         """
+        self.reachable = self.computeReachability()
+
+    def computeReachability(self):
+        reachable = [False] * len(self.nodes)
+
+        def dfs(node_id):
+            if reachable[node_id]:
+                return
+            reachable[node_id] = True
+            for succ in self.getSucc(node_id):
+                dfs(succ)
+
+        dfs(0)
+        return reachable
+
+    def isReachable(self, id):
+        return self.reachable[id]
 
     def getBlock(self, id):
         return self.nodes[id]
