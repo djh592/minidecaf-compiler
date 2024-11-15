@@ -1,8 +1,9 @@
 from typing import Protocol, TypeVar, cast
 
-from frontend.ast.node import Node, NullType
+from frontend.ast.node import T, Node, NullType
 from frontend.ast.tree import *
-from frontend.ast.visitor import RecursiveVisitor, Visitor
+from frontend.ast.tree import T, For
+from frontend.ast.visitor import T, RecursiveVisitor, Visitor
 from frontend.scope.globalscope import GlobalScope
 from frontend.scope.scope import Scope, ScopeKind
 from frontend.scope.scopestack import ScopeStack
@@ -73,7 +74,23 @@ class Namer(Visitor[ScopeStack, None]):
 
     def visitWhile(self, stmt: While, ctx: ScopeStack) -> None:
         stmt.cond.accept(self, ctx)
+        ctx.openLoop()
         stmt.body.accept(self, ctx)
+        ctx.closeLoop()
+
+    def visitFor(self, stmt: For, ctx: ScopeStack) -> None:
+        ctx.push(Scope(ScopeKind.LOCAL))
+        if stmt.init is not NULL:
+            stmt.init.accept(self, ctx)
+        if stmt.cond is not NULL:
+            stmt.cond.accept(self, ctx)
+        if stmt.update is not NULL:
+            stmt.update.accept(self, ctx)
+        ctx.openLoop()
+        stmt.body.accept(self, ctx)
+        ctx.closeLoop()
+        ctx.pop()
+        ctx
 
     def visitBreak(self, stmt: Break, ctx: ScopeStack) -> None:
         """
@@ -83,13 +100,18 @@ class Namer(Visitor[ScopeStack, None]):
         if not in a loop:
             raise DecafBreakOutsideLoopError()
         """
-        raise NotImplementedError
+        if not ctx.inLoop():
+            raise DecafBreakOutsideLoopError()
+        # raise NotImplementedError
 
     """
     def visitContinue(self, stmt: Continue, ctx: Scope) -> None:
     
     1. Refer to the implementation of visitBreak.
     """
+    def visitContinue(self, stmt: Continue, ctx: ScopeStack) -> None:
+        if not ctx.inLoop():
+            raise DecafContinueOutsideLoopError()
 
     def visitDeclaration(self, decl: Declaration, ctx: ScopeStack) -> None:
         """
