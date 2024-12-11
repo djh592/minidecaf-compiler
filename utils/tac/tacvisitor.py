@@ -16,6 +16,9 @@ class TACVisitor:
    def visitUnary(self, instr: Unary) -> None:
         self.visitOther(instr)
 
+   def visitCall(self, instr: Call) -> None:
+        self.visitOther(instr)
+
    def visitBinary(self, instr: Binary) -> None:
         self.visitOther(instr)
 

@@ -1,5 +1,5 @@
 from frontend.ast.node import Optional
-from frontend.ast.tree import Function, Optional
+from frontend.ast.tree import Function, Optional, ParameterList
 from frontend.ast import node
 from frontend.ast.tree import *
 from frontend.ast.visitor import Visitor
@@ -83,6 +83,11 @@ class TACFuncEmitter(TACVisitor):
     def visitUnarySelf(self, op: UnaryOp, operand: Temp) -> None:
         self.func.add(Unary(op, operand, operand))
 
+    def visitCall(self, label: FuncLabel, args: list[Temp]) -> Temp:
+        temp = self.freshTemp()
+        self.func.add(Call(temp, label, args))
+        return temp
+
     def visitBinary(self, op: BinaryOp, lhs: Temp, rhs: Temp) -> Temp:
         temp = self.freshTemp()
         self.func.add(Binary(op, temp, lhs, rhs))
@@ -141,10 +146,20 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         tacFuncs = []
         for funcName, astFunc in program.functions().items():
             # in step9, you need to use real parameter count
-            emitter = TACFuncEmitter(FuncLabel(funcName), 0, labelManager)
+            emitter = TACFuncEmitter(FuncLabel(funcName), len(astFunc.params), labelManager)
+            astFunc.params.accept(self, emitter)
             astFunc.body.accept(self, emitter)
             tacFuncs.append(emitter.visitEnd())
         return TACProg(tacFuncs)
+
+    def visitParameter(self, param: Parameter, mv: TACFuncEmitter) -> None:
+        temp = mv.freshTemp()
+        param.getattr('symbol').temp = temp
+        mv.func.argTemps.append(temp)
+    
+    def visitParameterList(self, params: ParameterList, mv: TACFuncEmitter) -> None:
+        for param in params.children:
+            param.accept(self, mv)
 
     def visitBlock(self, block: Block, mv: TACFuncEmitter) -> None:
         for child in block:
@@ -164,7 +179,8 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         """
         1. Set the 'val' attribute of ident as the temp variable of the 'symbol' attribute of ident.
         """
-        ident.setattr("val", ident.getattr("symbol").temp)
+        symbol = ident.getattr('symbol')
+        ident.setattr("val", symbol.temp)
         # raise NotImplementedError
 
     def visitDeclaration(self, decl: Declaration, mv: TACFuncEmitter) -> None:
@@ -259,6 +275,15 @@ class TACGen(Visitor[TACFuncEmitter, None]):
             node.UnaryOp.LogicNot: tacop.TacUnaryOp.LNOT,
         }[expr.op]
         expr.setattr("val", mv.visitUnary(op, expr.operand.getattr("val")))
+
+    def visitExpressionList(self, exprs: ExpressionList, mv: TACFuncEmitter) -> None:
+        for expr in exprs.children:
+            expr.accept(self, mv)
+
+    def visitCall(self, expr: Call, mv: TACFuncEmitter) -> None:
+        expr.args.accept(self, mv)
+        argTemps = [arg.getattr("val") for arg in expr.args.children]
+        expr.setattr("val", mv.visitCall(FuncLabel(expr.getattr("symbol").name), argTemps))
 
     def visitBinary(self, expr: Binary, mv: TACFuncEmitter) -> None:
         expr.lhs.accept(self, mv)

@@ -39,11 +39,34 @@ class Namer(Visitor[ScopeStack, None]):
         if not program.hasMainFunc():
             raise DecafNoMainFuncError
 
-        for func in program.functions().values():
+        for func in program.children:
             func.accept(self, ctx)
 
+    def visitParameter(self, param: Parameter, ctx: ScopeStack) -> None:
+        if ctx.top().lookup(param.ident.value) is not None:
+            raise DecafDeclConflictError(param.ident.value)
+        symbol = VarSymbol(param.ident.value, param.var_t.type)
+        ctx.top().declare(symbol)
+        param.setattr("symbol", symbol)
+
+    def visitParameterList(self, params: ParameterList, ctx: ScopeStack) -> None:
+        for param in params:
+            param.accept(self, ctx)
+
     def visitFunction(self, func: Function, ctx: ScopeStack) -> None:
-        func.body.accept(self, ctx)
+        if ctx.globalscope.lookup(func.ident.value) is not None:
+            raise DecafDeclConflictError(func)
+        symbol = FuncSymbol(func.ident.value, func.ret_t.type, ctx.globalscope)
+        for param in func.params.children:
+            symbol.addParaType(param.var_t.type)
+        ctx.globalscope.declare(symbol)
+        func.setattr("symbol", symbol)
+
+        ctx.push(Scope(ScopeKind.LOCAL))
+        func.params.accept(self, ctx)
+        for child in func.body:
+            child.accept(self, ctx)
+        ctx.pop()
 
     def visitBlock(self, block: Block, ctx: ScopeStack) -> None:
         ctx.push(Scope(ScopeKind.LOCAL))
@@ -139,6 +162,25 @@ class Namer(Visitor[ScopeStack, None]):
 
     def visitUnary(self, expr: Unary, ctx: ScopeStack) -> None:
         expr.operand.accept(self, ctx)
+
+    def visitExpressionList(self, exprs: ExpressionList, ctx: ScopeStack) -> None:
+        for expr in exprs:
+            expr.accept(self, ctx)
+
+    def visitCall(self, expr: Call, ctx: ScopeStack) -> None:
+        if not ctx.lookup(expr.ident.value).isFunc:
+            raise DecafBadFuncCallError(expr.ident.value)
+        func: FuncSymbol = GlobalScope.lookup(expr.ident.value)
+        if func is None:
+            raise DecafUndefinedFuncError(expr.ident.value)
+        expr.setattr("symbol", func)
+
+        expr.args.accept(self, ctx)
+        if len(expr.args) != func.parameterNum:
+            raise DecafBadFuncCallError(expr.ident.value)
+        for i in range(len(expr.args.children)):
+            if not func.getParaType(i) == INT:
+                raise DecafBadFuncCallError(expr.ident.value)
 
     def visitBinary(self, expr: Binary, ctx: ScopeStack) -> None:
         expr.lhs.accept(self, ctx)

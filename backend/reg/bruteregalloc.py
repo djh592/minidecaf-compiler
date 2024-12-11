@@ -36,6 +36,15 @@ class BruteRegAlloc(RegAlloc):
 
     def accept(self, graph: CFG, info: SubroutineInfo) -> None:
         subEmitter = RiscvSubroutineEmitter(self.emitter, info)
+
+        args = info.args
+        argRegs = Riscv.ArgRegs
+        for idx, arg in enumerate(args):
+            if idx < len(argRegs):
+                self.bind(arg, Riscv.ArgRegs[idx])
+            else:
+                pass
+
         for bb in graph.iterator():
             # you need to think more here
             # maybe we don't need to alloc regs for all the basic blocks
@@ -81,6 +90,24 @@ class BruteRegAlloc(RegAlloc):
         srcRegs: list[Reg] = []
         dstRegs: list[Reg] = []
 
+        if instr.isCall():
+            instr: Riscv.Call
+            savedCallerRegs = [reg for reg in self.emitter.callerSaveRegs if reg.occupied]
+            for reg in savedCallerRegs:
+                subEmitter.emitStoreToStack(reg)
+                self.unbind(reg.temp)
+
+            for idx, arg in enumerate(instr.args):
+                if idx < len(Riscv.ArgRegs):
+                    reg = Riscv.ArgRegs[idx]
+                    if reg.occupied:
+                        self.unbind(reg.temp)
+                    self.bind(arg, reg)
+                    subEmitter.emitComment("  allocate {} to {} (read: {})".format(str(arg), str(reg), str(True)))
+                    subEmitter.emitLoadFromStack(reg, arg)
+                else:
+                    pass
+                    
         for i in range(len(instr.srcs)):
             temp = instr.srcs[i]
             if isinstance(temp, Reg):

@@ -42,7 +42,7 @@ class RiscvAsmEmitter():
         for instr in func.getInstrSeq():
             instr.accept(selector)
 
-        info = SubroutineInfo(func.entry)
+        info = SubroutineInfo(func.entry, func.argTemps)
 
         return (selector.seq, info)
 
@@ -80,6 +80,10 @@ class RiscvAsmEmitter():
                 TacUnaryOp.LNOT: RvUnaryOp.SEQZ,
             }[instr.op]
             self.seq.append(Riscv.Unary(op, instr.dst, instr.operand))
+
+        def visitCall(self, instr: Call) -> None:
+            self.seq.append(Riscv.Call(instr.dst, instr.label, instr.args))
+            self.seq.append(Riscv.Move(instr.dst, Riscv.A0))
 
         def visitBinary(self, instr: Binary) -> None:
             """
@@ -202,6 +206,8 @@ class RiscvSubroutineEmitter():
                     Riscv.NativeStoreWord(Riscv.CalleeSaved[i], Riscv.SP, 4 * i)
                 )
 
+        self.printer.printInstr(Riscv.NativeStoreWord(Riscv.RA, Riscv.SP, len(Riscv.CalleeSaved) * 4))
+
         self.printer.printComment("end of prologue")
         self.printer.println("")
 
@@ -227,6 +233,8 @@ class RiscvSubroutineEmitter():
                 self.printer.printInstr(
                     Riscv.NativeLoadWord(Riscv.CalleeSaved[i], Riscv.SP, 4 * i)
                 )
+
+        self.printer.printInstr(Riscv.NativeLoadWord(Riscv.RA, Riscv.SP, len(Riscv.CalleeSaved) * 4))
 
         self.printer.printInstr(Riscv.SPAdd(self.nextLocalOffset))
         self.printer.printComment("end of epilogue")

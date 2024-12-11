@@ -2,6 +2,7 @@ from enum import Enum, auto, unique
 from typing import Any, Optional, Union
 
 from utils.label.label import Label
+from utils.label.funclabel import FuncLabel
 from utils.tac.reg import Reg
 
 from .tacop import *
@@ -87,6 +88,22 @@ class Unary(TACInstr):
         v.visitUnary(self)
 
 
+# Function call.
+class Call(TACInstr):
+    def __init__(self, dst: Temp, label: FuncLabel, args: list[Temp]) -> None:
+        super().__init__(InstrKind.CALL, [dst], args, label)
+        self.dst = dst
+        self.label = label
+        self.args = args
+
+    def __str__(self) -> str:
+        args_str = ", ".join(map(str, self.args))
+        return "%s = CALL %s(%s)" % (self.dst, self.label, args_str)
+
+    def accept(self, v: TACVisitor) -> None:
+        v.visitCall(self)
+
+
 # Binary Operations.
 class Binary(TACInstr):
     def __init__(self, op: TacBinaryOp, dst: Temp, lhs: Temp, rhs: Temp) -> None:
@@ -109,8 +126,8 @@ class Binary(TACInstr):
             TacBinaryOp.LEQ: "<=",
             TacBinaryOp.SGT: ">",
             TacBinaryOp.GEQ: ">=",
-            TacBinaryOp.AND: "&&",
-            TacBinaryOp.OR: "||",
+            # TacBinaryOp.AND: "&&",
+            # TacBinaryOp.OR: "||",
         }[self.op]
         return "%s = (%s %s %s)" % (self.dst, self.lhs, opStr, self.rhs)
 

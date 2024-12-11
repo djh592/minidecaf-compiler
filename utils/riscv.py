@@ -130,6 +130,14 @@ class Riscv:
                 str(self.dsts[0]), str(self.srcs[0])
             )
 
+    class Call(BackendInstr):
+        def __init__(self, dst: Temp, label: FuncLabel, args: list[Temp]) -> None:
+            super().__init__(InstrKind.CALL, [dst], args, label)
+            self.args = args
+            
+        def __str__(self) -> str:
+            return "call " + str(self.label.name)
+
     class Binary(BackendInstr):
         def __init__(self, op: RvBinaryOp, dst: Temp, src0: Temp, src1: Temp) -> None:
             super().__init__(InstrKind.SEQ, [dst], [src0, src1], None)

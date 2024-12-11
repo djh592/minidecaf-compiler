@@ -27,6 +27,9 @@ class BackendInstr:
     def isReturn(self) -> bool:
         return self.kind == InstrKind.RET
     
+    def isCall(self) -> bool:
+        return self.kind == InstrKind.CALL
+    
     def getRead(self) -> list[int]:
         return [src.index for src in self.srcs]
 

@@ -31,13 +31,19 @@ class Visitor(Protocol[T, U]):  # type: ignore
     def visitBlock(self, that: Block, ctx: T) -> Optional[Sequence[Optional[U]]]:
         return self.visitOther(that, ctx)
 
+    def visitParameter(self, that: Parameter, ctx: T) -> Optional[U]:
+        return self.visitOther(that, ctx)
+
+    def visitParameterList(self, that: ParameterList, ctx: T) -> Optional[Sequence[Optional[U]]]:
+        return self.visitOther(that, ctx)
+
     def visitFunction(self, that: Function, ctx: T) -> Optional[U]:
         return self.visitOther(that, ctx)
 
-    def visitIf(self, that: If, ctx: T) -> Optional[U]:
-        return self.visitOther(that, ctx)
-
     def visitReturn(self, that: Return, ctx: T) -> Optional[U]:
+        return self.visitOther(that, ctx)
+    
+    def visitIf(self, that: If, ctx: T) -> Optional[U]:
         return self.visitOther(that, ctx)
 
     def visitWhile(self, that: While, ctx: T) -> Optional[U]:
@@ -56,6 +62,13 @@ class Visitor(Protocol[T, U]):  # type: ignore
         return self.visitOther(that, ctx)
 
     def visitUnary(self, that: Unary, ctx: T) -> Optional[U]:
+        return self.visitOther(that, ctx)
+
+
+    def visitExpressionList(self, that: ExpressionList, ctx: T) -> Optional[Sequence[Optional[U]]]:
+        return self.visitOther(that, ctx)
+
+    def visitCall(self, that: Call, ctx: T) -> Optional[U]:
         return self.visitOther(that, ctx)
 
     def visitBinary(self, that: Binary, ctx: T) -> Optional[U]:
