@@ -42,6 +42,7 @@ def p_empty(p: yacc.YaccProduction):
 def p_program(p):
     """
     program : program function
+    program : program declaration Semi
     """
     p[1].children.append(p[2])
     p[0] = p[1]

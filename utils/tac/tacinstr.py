@@ -69,6 +69,50 @@ class LoadImm4(TACInstr):
         v.visitLoadImm4(self)
 
 
+# Loading the address of a symbol.
+class LoadSymbol(TACInstr):
+    def __init__(self, dst: Temp, symbol: str) -> None:
+        super().__init__(InstrKind.SEQ, [dst], [], None)
+        self.dst = dst
+        self.symbol = symbol
+
+    def __str__(self) -> str:
+        return "%s = LOAD_SYMBOL %s" % (self.dst, self.symbol)
+
+    def accept(self, v: TACVisitor) -> None:
+        v.visitLoadSymbol(self)
+
+
+# Loading from memory at an offset from a base address.
+class Load(TACInstr):
+    def __init__(self, dst: Temp, src: Temp, offset: int) -> None:
+        super().__init__(InstrKind.SEQ, [dst], [src], None)
+        self.dst = dst
+        self.src = src
+        self.offset = offset
+
+    def __str__(self) -> str:
+        return "%s = LOAD %s, %d" % (self.dst, self.src, self.offset)
+
+    def accept(self, v: TACVisitor) -> None:
+        v.visitLoad(self)
+
+
+# Storing to memory at an offset from a base address.
+class Store(TACInstr):
+    def __init__(self, dst: Temp, offset: int, src: Temp) -> None:
+        super().__init__(InstrKind.SEQ, [], [dst, src], None)
+        self.dst = dst
+        self.offset = offset
+        self.src = src
+
+    def __str__(self) -> str:
+        return "STORE %s, %d, %s" % (self.dst, self.offset, self.src)
+
+    def accept(self, v: TACVisitor) -> None:
+        v.visitStore(self)
+
+
 # Unary operations.
 class Unary(TACInstr):
     def __init__(self, op: TacUnaryOp, dst: Temp, operand: Temp) -> None:

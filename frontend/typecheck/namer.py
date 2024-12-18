@@ -143,21 +143,50 @@ class Namer(Visitor[ScopeStack, None]):
         3. Set the 'symbol' attribute of decl.
         4. If there is an initial value, visit it.
         """
-        if ctx.top().lookup(decl.ident.value) is not None:
-            raise DecafDeclConflictError(decl.ident.name)
-        symbol = VarSymbol(decl.ident.value, decl.var_t.type)
-        ctx.top().declare(symbol)
-        decl.setattr("symbol", symbol)
-        if decl.init_expr is not None:
-            decl.init_expr.accept(self, ctx)
+        if ctx.top().isGlobalScope():
+            symbol = VarSymbol(decl.ident.value, decl.var_t.type, True)
+            if decl.init_expr is not NULL:
+                if isinstance(decl.init_expr, IntLiteral):
+                    symbol.setInitValue(decl.init_expr.value)
+                else:
+                    # other types of initial value are not supported yet
+                    raise NotImplementedError 
+            else:
+                symbol.setInitValue(None)
+            if ctx.globalscope.lookup(decl.ident.value) is not None:
+                sameNamedSymbol = ctx.globalscope.lookup(decl.ident.value)
+                if isinstance(sameNamedSymbol, FuncSymbol):
+                    # function and variable with the same name
+                    raise DecafDeclConflictError(decl.ident.name)
+                elif isinstance(sameNamedSymbol, VarSymbol):
+                    if sameNamedSymbol.initValue is not None:
+                        if symbol.initValue is not None:
+                            # redeclaration of a global variable
+                            raise DecafDeclConflictError(decl.ident.name)
+                        else:
+                            # use the initial value of the previous declaration
+                            symbol.setInitValue(sameNamedSymbol.initValue)
+                else:
+                    # other types of symbols are not supported yet
+                    raise NotImplementedError 
+            ctx.globalscope.declare(symbol)
+            decl.setattr("symbol", symbol)
+        else:
+            symbol = VarSymbol(decl.ident.value, decl.var_t.type, False)
+            if ctx.top().lookup(decl.ident.value) is not None:
+                raise DecafDeclConflictError(decl.ident.name)
+            ctx.top().declare(symbol)
+            decl.setattr("symbol", symbol)
+            if decl.init_expr is not NULL:
+                decl.init_expr.accept(self, ctx)
         # raise NotImplementedError
 
     def visitAssignment(self, expr: Assignment, ctx: ScopeStack) -> None:
         """
         1. Refer to the implementation of visitBinary.
         """
-        expr.lhs.accept(self, ctx)
         expr.rhs.accept(self, ctx)
+        expr.lhs.accept(self, ctx)
         # raise NotImplementedError
 
     def visitUnary(self, expr: Unary, ctx: ScopeStack) -> None:

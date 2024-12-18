@@ -17,7 +17,7 @@ class Asm:
     def transform(self, prog: TACProg):
         analyzer = LivenessAnalyzer()
         
-        emitter = RiscvAsmEmitter(Riscv.AllocatableRegs, Riscv.CallerSaved)
+        emitter = RiscvAsmEmitter(Riscv.AllocatableRegs, Riscv.CallerSaved, prog.globals)
         reg_alloc = BruteRegAlloc(emitter)
         for func in prog.funcs:
             pair = emitter.selectInstr(func)

@@ -113,6 +113,30 @@ class Riscv:
         def __str__(self) -> str:
             return "li " + Riscv.FMT2.format(str(self.dsts[0]), self.value)
 
+    class LoadAddr(BackendInstr):
+        def __init__(self, dst: Temp, label: Label) -> None:
+            super().__init__(InstrKind.SEQ, [dst], [], None)
+            self.label = label
+
+        def __str__(self) -> str:
+            return "la " + Riscv.FMT2.format(str(self.dsts[0]), str(self.label))
+        
+    class LoadWord(BackendInstr):
+        def __init__(self, dst: Temp, src: Temp, offset: int) -> None:
+            super().__init__(InstrKind.SEQ, [dst], [src], None)
+            self.offset = offset
+
+        def __str__(self) -> str:
+            return "lw " + Riscv.FMT_OFFSET.format(str(self.dsts[0]), str(self.offset), str(self.srcs[0]))
+        
+    class StoreWord(BackendInstr):
+        def __init__(self, src: Temp, dst: Temp, offset: int) -> None:
+            super().__init__(InstrKind.SEQ, [], [src, dst], None)
+            self.offset = offset
+
+        def __str__(self) -> str:
+            return "sw " + Riscv.FMT_OFFSET.format(str(self.srcs[0]), str(self.offset), str(self.srcs[1]))
+
     class Move(BackendInstr):
         def __init__(self, dst: Temp, src: Temp) -> None:
             super().__init__(InstrKind.SEQ, [dst], [src], None)

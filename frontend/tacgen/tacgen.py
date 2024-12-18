@@ -75,6 +75,19 @@ class TACFuncEmitter(TACVisitor):
         self.func.add(LoadImm4(temp, value))
         return temp
 
+    def visitLoadSymbol(self, symbol: VarSymbol) -> Temp:
+        temp = self.freshTemp()
+        self.func.add(LoadSymbol(temp, symbol.name))
+        return temp
+    
+    def visitLoadMem(self, src: Temp, offset: int) -> Temp:
+        temp = self.freshTemp()
+        self.func.add(Load(temp, src, offset))
+        return temp
+    
+    def visitStoreMem(self, src: Temp, dst: Temp, offset: int) -> None:
+        self.func.add(Store(dst, offset, src))
+
     def visitUnary(self, op: UnaryOp, operand: Temp) -> Temp:
         temp = self.freshTemp()
         self.func.add(Unary(op, temp, operand))
@@ -150,7 +163,10 @@ class TACGen(Visitor[TACFuncEmitter, None]):
             astFunc.params.accept(self, emitter)
             astFunc.body.accept(self, emitter)
             tacFuncs.append(emitter.visitEnd())
-        return TACProg(tacFuncs)
+        globals: list[VarSymbol] = []
+        for decl in program.globals():
+            globals.append(decl.getattr("symbol"))     
+        return TACProg(tacFuncs, globals)
 
     def visitParameter(self, param: Parameter, mv: TACFuncEmitter) -> None:
         temp = mv.freshTemp()
@@ -179,8 +195,12 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         """
         1. Set the 'val' attribute of ident as the temp variable of the 'symbol' attribute of ident.
         """
-        symbol = ident.getattr('symbol')
-        ident.setattr("val", symbol.temp)
+        symbol: VarSymbol = ident.getattr('symbol')
+        if symbol.isGlobal:
+            temp = mv.visitLoadSymbol(symbol)
+            ident.setattr("val", mv.visitLoadMem(temp, 0))
+        else:
+            ident.setattr("val", symbol.temp)
         # raise NotImplementedError
 
     def visitDeclaration(self, decl: Declaration, mv: TACFuncEmitter) -> None:
@@ -189,7 +209,7 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         2. Use mv.freshTemp to get a new temp variable for this symbol.
         3. If the declaration has an initial value, use mv.visitAssignment to set it.
         """
-        symbol = decl.getattr("symbol")
+        symbol: VarSymbol = decl.getattr("symbol")
         symbol.temp = mv.freshTemp()
         if decl.init_expr is not NULL:
             decl.init_expr.accept(self, mv)
@@ -203,8 +223,13 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         3. Set the 'val' attribute of expr as the value of assignment instruction.
         """
         expr.rhs.accept(self, mv)
-        expr.lhs.accept(self, mv)
-        expr.setattr("val", mv.visitAssignment(expr.lhs.getattr("symbol").temp, expr.rhs.getattr("val")))
+        lhsSymbol: VarSymbol = expr.lhs.getattr("symbol")
+        if lhsSymbol.isGlobal:
+            mv.visitStoreMem(expr.rhs.getattr("val"), mv.visitLoadSymbol(lhsSymbol), 0)
+            expr.setattr("val", expr.rhs.getattr("val"))
+        else:
+            expr.lhs.accept(self, mv)
+            expr.setattr("val", mv.visitAssignment(expr.lhs.getattr("symbol").temp, expr.rhs.getattr("val")))
         # raise NotImplementedError
 
     def visitIf(self, stmt: If, mv: TACFuncEmitter) -> None:

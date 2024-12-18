@@ -1,5 +1,6 @@
 from typing import Sequence, Tuple
 
+from frontend.symbol.varsymbol import VarSymbol
 from utils.error import IllegalArgumentException
 from utils.label.label import Label, LabelKind
 from utils.riscv import Riscv, RvBinaryOp, RvUnaryOp
@@ -21,13 +22,36 @@ class RiscvAsmEmitter():
         self,
         allocatableRegs: list[Reg],
         callerSaveRegs: list[Reg],
+        globals: list[VarSymbol],
     ):
         self.allocatableRegs = allocatableRegs
         self.callerSaveRegs = callerSaveRegs
+        self.globals = globals
         self.printer = AsmCodePrinter()
     
         # the start of the asm code
         # int step10, you need to add the declaration of global var here
+
+        # Add global variable declarations
+        initialized_globals = [var for var in globals if var.initValue is not None]
+        uninitialized_globals = [var for var in globals if var.initValue is None]
+
+        if len(initialized_globals) > 0:
+            self.printer.println(".data")
+            for var in initialized_globals:
+                self.printer.println(f".globl {var.name}")
+                self.printer.println(f"{var.name}:")
+                self.printer.println(f"    .word {var.initValue}")
+            self.printer.println("")
+
+        if len(uninitialized_globals) > 0:
+            self.printer.println(".bss")
+            for var in uninitialized_globals:
+                self.printer.println(f".globl {var.name}")
+                self.printer.println(f"{var.name}:")
+                self.printer.println("    .space 4")
+            self.printer.println("")
+        
         self.printer.println(".text")
         self.printer.println(".global main")
         self.printer.println("")
@@ -71,6 +95,15 @@ class RiscvAsmEmitter():
 
         def visitLoadImm4(self, instr: LoadImm4) -> None:
             self.seq.append(Riscv.LoadImm(instr.dst, instr.value))
+
+        def visitLoadSymbol(self, instr: LoadSymbol) -> None:
+            self.seq.append(Riscv.LoadAddr(instr.dst, instr.symbol))
+
+        def visitLoad(self, instr: Load) -> None:
+            self.seq.append(Riscv.LoadWord(instr.dst, instr.src, instr.offset))
+
+        def visitStore(self, instr: Store) -> None:
+            self.seq.append(Riscv.StoreWord(instr.src, instr.dst, instr.offset))
 
         def visitUnary(self, instr: Unary) -> None:
             op = {
