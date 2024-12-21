@@ -224,9 +224,18 @@ def p_opt_expression_empty(p):
     p[0] = NULL
 
 
+def p_array_specifier(p):
+    """
+    array_specifier : Identifier LBracket Integer RBracket
+    array_specifier : array_specifier LBracket Integer RBracket
+    """
+    p[0] = ArraySpecifier(p[1], p[3])
+
+
 def p_declaration(p):
     """
     declaration : type Identifier
+    declaration : type array_specifier
     """
     p[0] = Declaration(p[1], p[2])
 
@@ -234,6 +243,7 @@ def p_declaration(p):
 def p_declaration_init(p):
     """
     declaration : type Identifier Assign expression
+    declaration : type array_specifier Assign expression
     """
     p[0] = Declaration(p[1], p[2], p[4])
 
@@ -254,6 +264,8 @@ def p_expression_precedence(p):
     multiplicative : unary
     unary : postfix
     postfix : primary
+    postfix : call_expression
+    postfix : index_expression
     """
     p[0] = p[1]
 
@@ -306,7 +318,7 @@ def p_expression_list_empty(p):
 
 def p_call_expression(p):
     """
-    postfix : Identifier LParen expression_list RParen
+    call_expression : Identifier LParen expression_list RParen
     """
     p[0] = Call(p[1], p[3])
 
@@ -314,6 +326,7 @@ def p_call_expression(p):
 def p_binary_expression(p):
     """
     assignment : Identifier Assign expression
+    assignment : unary Assign expression
     logical_or : logical_or Or logical_and
     logical_and : logical_and And bit_or
     bit_or : bit_or BitOr xor
@@ -339,6 +352,14 @@ def p_conditional_expression(p):
     conditional : logical_or Question expression Colon conditional
     """
     p[0] = ConditionExpression(p[1], p[3], p[5])
+
+
+def p_index_expression(p):
+    """
+    index_expression : Identifier LBracket expression RBracket
+    index_expression : index_expression LBracket expression RBracket
+    """
+    p[0] = IndexExpression(p[1], p[3])
 
 
 def p_int_literal_expression(p):

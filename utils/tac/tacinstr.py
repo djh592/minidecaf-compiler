@@ -113,6 +113,20 @@ class Store(TACInstr):
         v.visitStore(self)
 
 
+# Allocating for an array.
+class Alloc(TACInstr):
+    def __init__(self, dst: Temp, size: int) -> None:
+        super().__init__(InstrKind.SEQ, [dst], [], None)
+        self.dst = dst
+        self.size = size
+
+    def __str__(self) -> str:
+        return "%s = ALLOC %d" % (self.dst, self.size)
+
+    def accept(self, v: TACVisitor) -> None:
+        v.visitAlloc(self)
+
+
 # Unary operations.
 class Unary(TACInstr):
     def __init__(self, op: TacUnaryOp, dst: Temp, operand: Temp) -> None:

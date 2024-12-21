@@ -143,8 +143,19 @@ class Namer(Visitor[ScopeStack, None]):
         3. Set the 'symbol' attribute of decl.
         4. If there is an initial value, visit it.
         """
+        if isinstance(decl.ident, ArraySpecifier):
+            sizes = [size.value for size in decl.ident.sizes]
+            dims = sizes[::-1]
+            if any([size <= 0 for size in sizes]):
+                raise DecafBadArraySizeError(decl.ident.base.value)
+            symbolType = ArrayType.multidim(decl.var_t.type, *dims)
+        elif isinstance(decl.ident, Identifier):
+            symbolType = decl.var_t.type
+        else:
+            raise NotImplementedError
+
         if ctx.top().isGlobalScope():
-            symbol = VarSymbol(decl.ident.value, decl.var_t.type, True)
+            symbol = VarSymbol(decl.ident.value, symbolType, True)
             if decl.init_expr is not NULL:
                 if isinstance(decl.init_expr, IntLiteral):
                     symbol.setInitValue(decl.init_expr.value)
@@ -172,19 +183,26 @@ class Namer(Visitor[ScopeStack, None]):
             ctx.globalscope.declare(symbol)
             decl.setattr("symbol", symbol)
         else:
-            symbol = VarSymbol(decl.ident.value, decl.var_t.type, False)
+            symbol = VarSymbol(decl.ident.value, symbolType, False)
             if ctx.top().lookup(decl.ident.value) is not None:
                 raise DecafDeclConflictError(decl.ident.name)
             ctx.top().declare(symbol)
             decl.setattr("symbol", symbol)
             if decl.init_expr is not NULL:
                 decl.init_expr.accept(self, ctx)
+        decl.ident.accept(self, ctx)
         # raise NotImplementedError
 
     def visitAssignment(self, expr: Assignment, ctx: ScopeStack) -> None:
         """
         1. Refer to the implementation of visitBinary.
         """
+        if isinstance(expr.lhs, Identifier):
+            lhsSymbol = ctx.lookup(expr.lhs.value)
+            if lhsSymbol is None:
+                raise DecafUndefinedVarError(expr.lhs.value)
+            if isinstance(lhsSymbol.type, ArrayType):
+                raise DecafTypeMismatchError()
         expr.rhs.accept(self, ctx)
         expr.lhs.accept(self, ctx)
         # raise NotImplementedError
@@ -224,6 +242,21 @@ class Namer(Visitor[ScopeStack, None]):
         expr.otherwise.accept(self, ctx)
         # raise NotImplementedError
 
+    def visitIndexExpr(self, expr: IndexExpression, ctx: ScopeStack) -> None:
+        for index in expr.indexes:
+            index.accept(self, ctx)
+        symbol = ctx.lookup(expr.ident.value)
+        if symbol is None:
+            raise DecafUndefinedVarError(expr.ident.value)
+        if not isinstance(symbol.type, ArrayType):
+            raise DecafBadIndexError(expr.ident.value)
+        else:
+            arrayDim = symbol.type.dim
+            indexDim = expr.dim
+            if not arrayDim == indexDim:
+                raise DecafBadIndexError(expr.ident.value)
+        expr.setattr("symbol", symbol)
+
     def visitIdentifier(self, ident: Identifier, ctx: ScopeStack) -> None:
         """
         1. Use ctx.lookup to find the symbol corresponding to ident.
@@ -233,8 +266,16 @@ class Namer(Visitor[ScopeStack, None]):
         symbol = ctx.lookup(ident.value)
         if symbol is None:
             raise DecafUndefinedVarError(ident.value)
+        if isinstance(symbol.type, ArrayType):
+            raise DecafTypeMismatchError()
         ident.setattr("symbol", symbol)
         # raise NotImplementedError
+
+    def visitArraySpecifier(self, array: ArraySpecifier, ctx: ScopeStack) -> None:
+        symbol = ctx.lookup(array.base.value)
+        if symbol is None:
+            raise DecafUndefinedVarError(array.base.value)
+        array.setattr("symbol", symbol)
 
     def visitIntLiteral(self, expr: IntLiteral, ctx: ScopeStack) -> None:
         value = expr.value

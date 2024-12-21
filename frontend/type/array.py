@@ -46,6 +46,14 @@ class ArrayType(DecafType):
     def dim(self) -> int:
         "To get the dimension of an array."
         return self.base.dim + 1 if isinstance(self.base, ArrayType) else 1
+    
+    @property
+    def dims(self) -> list[int]:
+        "To get the dimensions of an array."
+        if isinstance(self.base, ArrayType):
+            return self.base.dims + [self.length]
+        else:
+            return [self.length]
 
     def __eq__(self, o: object) -> bool:
         if (

@@ -312,7 +312,7 @@ class Declaration(Node):
     def __init__(
         self,
         var_t: TypeLiteral,
-        ident: Identifier,
+        ident: Union[Identifier, ArraySpecifier],
         init_expr: Optional[Expression] = None,
     ) -> None:
         super().__init__("declaration")
@@ -443,7 +443,7 @@ class Assignment(Binary):
     It's actually a kind of binary expression, but it'll make things easier if we use another accept method to handle it.
     """
 
-    def __init__(self, lhs: Identifier, rhs: Expression) -> None:
+    def __init__(self, lhs: Union[Identifier, Unary], rhs: Expression) -> None:
         super().__init__(BinaryOp.Assign, lhs, rhs)
 
     def accept(self, v: Visitor[T, U], ctx: T):
@@ -482,6 +482,50 @@ class ConditionExpression(Expression):
         )
 
 
+class IndexExpression(Expression):
+    """
+    AST node of index expression.
+    """
+
+    def __init__(self, base: Union[Identifier, IndexExpression], index: Expression) -> None:
+        super().__init__("index_expr")
+        self.base = base
+        self.index = index
+
+    @property
+    def ident(self) -> Identifier:
+        if isinstance(self.base, Identifier):
+            return self.base
+        return self.base.ident
+    
+    @property
+    def indexes(self) -> list[Expression]:
+        if isinstance(self.base, Identifier):
+            return [self.index]
+        return  self.base.indexes + [self.index]
+    
+    @property
+    def dim(self) -> int:
+        if isinstance(self.base, Identifier):
+            return 1
+        return self.base.dim + 1
+
+    def __getitem__(self, key: int) -> Node:
+        return (self.base, self.index)[key]
+    
+    def __len__(self) -> int:
+        return 2
+    
+    def accept(self, v: Visitor[T, U], ctx: T):
+        return v.visitIndexExpr(self, ctx)
+    
+    def __str__(self) -> str:
+        return "{}[{}]".format(
+            self.base,
+            self.index,
+        )
+
+
 class Identifier(Expression):
     """
     AST node of identifier "expression".
@@ -505,6 +549,50 @@ class Identifier(Expression):
 
     def is_leaf(self):
         return True
+
+
+class ArraySpecifier(Identifier):
+    """
+    AST node of array identifier.
+    """
+
+    def __init__(self, base: Union[Identifier, ArraySpecifier], size: IntLiteral) -> None:
+        super().__init__(base.value)
+        self.base = base
+        self.size = size
+
+    @property
+    def ident(self) -> Identifier:
+        if isinstance(self.base, ArraySpecifier):
+            return self.base.ident
+        return self
+
+    @property
+    def sizes(self) -> list[IntLiteral]:
+        if isinstance(self.base, ArraySpecifier):
+            return self.base.sizes + [self.size]
+        return [self.size]
+    
+    @property
+    def dim(self) -> int:
+        if isinstance(self.base, ArraySpecifier):
+            return self.base.dim + 1
+        return 1
+
+    def __getitem__(self, key: int) -> Node:
+        return (self.base, self.size)[key]
+    
+    def __len__(self) -> int:
+        return 2
+    
+    def accept(self, v: Visitor[T, U], ctx: T):
+        return v.visitArraySpecifier(self, ctx)
+    
+    def __str__(self) -> str:
+        return "array_specifier({}[{}])".format(
+            self.base,
+            self.size,
+        )
 
 
 class IntLiteral(Expression):

@@ -64,7 +64,6 @@ class Visitor(Protocol[T, U]):  # type: ignore
     def visitUnary(self, that: Unary, ctx: T) -> Optional[U]:
         return self.visitOther(that, ctx)
 
-
     def visitExpressionList(self, that: ExpressionList, ctx: T) -> Optional[Sequence[Optional[U]]]:
         return self.visitOther(that, ctx)
 
@@ -82,8 +81,14 @@ class Visitor(Protocol[T, U]):  # type: ignore
 
     def visitCondExpr(self, that: ConditionExpression, ctx: T) -> Optional[U]:
         return self.visitOther(that, ctx)
+    
+    def visitIndexExpr(self, that: IndexExpression, ctx: T) -> Optional[U]:
+        return self.visitOther(that, ctx)
 
     def visitIdentifier(self, that: Identifier, ctx: T) -> Optional[U]:
+        return self.visitOther(that, ctx)
+    
+    def visitArraySpecifier(self, that: ArraySpecifier, ctx: T) -> Optional[U]:
         return self.visitOther(that, ctx)
 
     def visitIntLiteral(self, that: IntLiteral, ctx: T) -> Optional[U]:

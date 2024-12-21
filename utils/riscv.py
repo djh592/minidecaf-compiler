@@ -137,6 +137,14 @@ class Riscv:
         def __str__(self) -> str:
             return "sw " + Riscv.FMT_OFFSET.format(str(self.srcs[0]), str(self.offset), str(self.srcs[1]))
 
+    class AllocStack(BackendInstr):
+        def __init__(self, offset: int) -> None:
+            super().__init__(InstrKind.SEQ, [], [], None)
+            self.offset = offset
+
+        def __str__(self) -> str:
+            return "addi " + Riscv.FMT3.format(str(Riscv.SP), str(Riscv.SP), str(-self.offset))
+
     class Move(BackendInstr):
         def __init__(self, dst: Temp, src: Temp) -> None:
             super().__init__(InstrKind.SEQ, [dst], [src], None)

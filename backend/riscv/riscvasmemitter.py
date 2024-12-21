@@ -49,7 +49,7 @@ class RiscvAsmEmitter():
             for var in uninitialized_globals:
                 self.printer.println(f".globl {var.name}")
                 self.printer.println(f"{var.name}:")
-                self.printer.println("    .space 4")
+                self.printer.println(f"    .space {var.type.size}")
             self.printer.println("")
         
         self.printer.println(".text")
@@ -104,6 +104,10 @@ class RiscvAsmEmitter():
 
         def visitStore(self, instr: Store) -> None:
             self.seq.append(Riscv.StoreWord(instr.src, instr.dst, instr.offset))
+
+        def visitAlloc(self, instr: Alloc) -> None:
+            self.seq.append(Riscv.AllocStack(instr.size))
+            self.seq.append(Riscv.Move(instr.dst, Riscv.SP))  
 
         def visitUnary(self, instr: Unary) -> None:
             op = {
@@ -179,7 +183,7 @@ class RiscvSubroutineEmitter():
         self.printer = emitter.printer
         
         # + 4 is for the RA reg 
-        self.nextLocalOffset = 4 * len(Riscv.CalleeSaved) + 4
+        self.nextLocalOffset = 4 * len(Riscv.CalleeSaved) + 8
         
         # the buf which stored all the NativeInstrs in this function
         self.buf: list[BackendInstr] = []
@@ -204,7 +208,7 @@ class RiscvSubroutineEmitter():
             self.offsets[src.temp.index] = self.nextLocalOffset
             self.nextLocalOffset += 4
         self.buf.append(
-            Riscv.NativeStoreWord(src, Riscv.SP, self.offsets[src.temp.index])
+            Riscv.NativeStoreWord(src, Riscv.FP, self.offsets[src.temp.index])
         )
 
     # load some temp from stack
@@ -215,7 +219,7 @@ class RiscvSubroutineEmitter():
             raise IllegalArgumentException()
         else:
             self.buf.append(
-                Riscv.NativeLoadWord(dst, Riscv.SP, self.offsets[src.index])
+                Riscv.NativeLoadWord(dst, Riscv.FP, self.offsets[src.index])
             )
 
     # add a NativeInstr to buf
@@ -230,16 +234,19 @@ class RiscvSubroutineEmitter():
     def emitFunc(self):
         self.printer.printComment("start of prologue")
         self.printer.printInstr(Riscv.SPAdd(-self.nextLocalOffset))
+        self.printer.printInstr(Riscv.NativeStoreWord(Riscv.FP, Riscv.SP, len(Riscv.CalleeSaved) * 4 + 4))
+        self.printer.printInstr(Riscv.Move(Riscv.FP, Riscv.SP))
+
 
         # in step9, you need to think about how to store RA here
         # you can get some ideas from how to save CalleeSaved regs
         for i in range(len(Riscv.CalleeSaved)):
             if Riscv.CalleeSaved[i].isUsed():
                 self.printer.printInstr(
-                    Riscv.NativeStoreWord(Riscv.CalleeSaved[i], Riscv.SP, 4 * i)
+                    Riscv.NativeStoreWord(Riscv.CalleeSaved[i], Riscv.FP, 4 * i)
                 )
 
-        self.printer.printInstr(Riscv.NativeStoreWord(Riscv.RA, Riscv.SP, len(Riscv.CalleeSaved) * 4))
+        self.printer.printInstr(Riscv.NativeStoreWord(Riscv.RA, Riscv.FP, len(Riscv.CalleeSaved) * 4))
 
         self.printer.printComment("end of prologue")
         self.printer.println("")
@@ -264,11 +271,13 @@ class RiscvSubroutineEmitter():
         for i in range(len(Riscv.CalleeSaved)):
             if Riscv.CalleeSaved[i].isUsed():
                 self.printer.printInstr(
-                    Riscv.NativeLoadWord(Riscv.CalleeSaved[i], Riscv.SP, 4 * i)
+                    Riscv.NativeLoadWord(Riscv.CalleeSaved[i], Riscv.FP, 4 * i)
                 )
 
-        self.printer.printInstr(Riscv.NativeLoadWord(Riscv.RA, Riscv.SP, len(Riscv.CalleeSaved) * 4))
+        self.printer.printInstr(Riscv.NativeLoadWord(Riscv.RA, Riscv.FP, len(Riscv.CalleeSaved) * 4))
 
+        self.printer.printInstr(Riscv.Move(Riscv.SP, Riscv.FP))
+        self.printer.printInstr(Riscv.NativeLoadWord(Riscv.FP, Riscv.SP, len(Riscv.CalleeSaved) * 4 + 4))
         self.printer.printInstr(Riscv.SPAdd(self.nextLocalOffset))
         self.printer.printComment("end of epilogue")
         self.printer.println("")

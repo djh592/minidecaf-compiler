@@ -88,6 +88,11 @@ class TACFuncEmitter(TACVisitor):
     def visitStoreMem(self, src: Temp, dst: Temp, offset: int) -> None:
         self.func.add(Store(dst, offset, src))
 
+    def visitAlloc(self, size: int) -> Temp:
+        temp = self.freshTemp()
+        self.func.add(Alloc(temp, size))
+        return temp
+
     def visitUnary(self, op: UnaryOp, operand: Temp) -> Temp:
         temp = self.freshTemp()
         self.func.add(Unary(op, temp, operand))
@@ -210,10 +215,15 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         3. If the declaration has an initial value, use mv.visitAssignment to set it.
         """
         symbol: VarSymbol = decl.getattr("symbol")
-        symbol.temp = mv.freshTemp()
-        if decl.init_expr is not NULL:
-            decl.init_expr.accept(self, mv)
-            mv.visitAssignment(symbol.temp, decl.init_expr.getattr("val"))
+        if isinstance(symbol.type, ArrayType):
+            symbol.temp = mv.visitAlloc(symbol.type.size)
+            if decl.init_expr is not NULL:
+                raise NotImplementedError
+        else:
+            symbol.temp = mv.freshTemp()
+            if decl.init_expr is not NULL:
+                decl.init_expr.accept(self, mv)
+                mv.visitAssignment(symbol.temp, decl.init_expr.getattr("val"))
         # raise NotImplementedError
 
     def visitAssignment(self, expr: Assignment, mv: TACFuncEmitter) -> None:
@@ -223,14 +233,38 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         3. Set the 'val' attribute of expr as the value of assignment instruction.
         """
         expr.rhs.accept(self, mv)
-        lhsSymbol: VarSymbol = expr.lhs.getattr("symbol")
-        if lhsSymbol.isGlobal:
-            mv.visitStoreMem(expr.rhs.getattr("val"), mv.visitLoadSymbol(lhsSymbol), 0)
-            expr.setattr("val", expr.rhs.getattr("val"))
+        if isinstance(expr.lhs, IndexExpression):
+            rhsTemp = expr.rhs.getattr("val")
+            lhsSymbol: VarSymbol = expr.lhs.getattr("symbol")
+            sizes = lhsSymbol.type.dims
+            indexes = expr.lhs.indexes
+            indexes[0].accept(self, mv)
+            offset: Temp = indexes[0].getattr("val")
+            for size, index in zip(sizes[1:], indexes[1:]):
+                length: Temp = mv.visitLoad(size)
+                offset: Temp = mv.visitBinary(tacop.TacBinaryOp.MUL, offset, length)
+                index.accept(self, mv)
+                indexTemp: Temp = index.getattr("val")
+                offset: Temp = mv.visitBinary(tacop.TacBinaryOp.ADD, offset, indexTemp)
+            if lhsSymbol.isGlobal:
+                temp = mv.visitLoadSymbol(lhsSymbol)
+            else:
+                temp = lhsSymbol.temp
+            sizeTemp = mv.visitLoad(lhsSymbol.type.full_indexed.size)
+            offset: Temp = mv.visitBinary(tacop.TacBinaryOp.MUL, offset, sizeTemp)
+            addr: Temp = mv.visitBinary(tacop.TacBinaryOp.ADD, temp, offset)
+            mv.visitStoreMem(rhsTemp, addr, 0)
+            expr.setattr("val", rhsTemp)
+        elif isinstance(expr.lhs, Identifier):
+            lhsSymbol: VarSymbol = expr.lhs.getattr("symbol")
+            if lhsSymbol.isGlobal:
+                mv.visitStoreMem(expr.rhs.getattr("val"), mv.visitLoadSymbol(lhsSymbol), 0)
+                expr.setattr("val", expr.rhs.getattr("val"))
+            else:
+                expr.lhs.accept(self, mv)
+                expr.setattr("val", mv.visitAssignment(expr.lhs.getattr("symbol").temp, expr.rhs.getattr("val")))
         else:
-            expr.lhs.accept(self, mv)
-            expr.setattr("val", mv.visitAssignment(expr.lhs.getattr("symbol").temp, expr.rhs.getattr("val")))
-        # raise NotImplementedError
+            raise NotImplementedError
 
     def visitIf(self, stmt: If, mv: TACFuncEmitter) -> None:
         stmt.cond.accept(self, mv)
@@ -356,6 +390,29 @@ class TACGen(Visitor[TACFuncEmitter, None]):
         mv.visitLabel(exitLabel)
         expr.setattr("val", temp)
         # raise NotImplementedError
+
+    def visitIndexExpr(self, expr: IndexExpression, mv: TACFuncEmitter) -> None:
+        for index in expr.indexes:
+            index.accept(self, mv)
+        symbol: VarSymbol = expr.getattr("symbol")
+        sizes = symbol.type.dims
+        indexes = expr.indexes
+        indexes[0].accept(self, mv)
+        offset: Temp = indexes[0].getattr("val")
+        for size, index in zip(sizes[1:], indexes[1:]):
+            length: Temp = mv.visitLoad(size)
+            offset: Temp = mv.visitBinary(tacop.TacBinaryOp.MUL, offset, length)
+            index.accept(self, mv)
+            indexTemp: Temp = index.getattr("val")
+            offset: Temp = mv.visitBinary(tacop.TacBinaryOp.ADD, offset, indexTemp)
+        if symbol.isGlobal:
+            temp = mv.visitLoadSymbol(symbol)
+        else:
+            temp = symbol.temp
+        sizeTemp = mv.visitLoad(symbol.type.full_indexed.size)
+        offset: Temp = mv.visitBinary(tacop.TacBinaryOp.MUL, offset, sizeTemp)
+        addr = mv.visitBinary(tacop.TacBinaryOp.ADD, temp, offset)
+        expr.setattr("val", mv.visitLoadMem(addr, 0))
 
     def visitIntLiteral(self, expr: IntLiteral, mv: TACFuncEmitter) -> None:
         expr.setattr("val", mv.visitLoad(expr.value))
